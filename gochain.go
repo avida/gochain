@@ -1,33 +1,21 @@
 package main
 
 import (
+	"./utils"
 	"crypto/dsa"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"log"
 	"os"
 )
 
 const FirstData = "This is first block data"
 
-type BlockHeader struct {
-	Height             int
-	PrevHash, DataHash string
-	Timestamp          string
-}
-
-func computeHash(data string) string {
-	result := sha256.Sum256([]byte(data))
-	return base64.StdEncoding.EncodeToString(result[:])
-}
-
 func main() {
-  defer func() {
-    if r:= recover(); r != nil {
-      log.Println("Unexpected error: ", r)
-    }
-  }()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Unexpected error: ", r)
+		}
+	}()
 
 	log.Println("This is my first golang application")
 	switch os.Args[1] {
@@ -42,9 +30,9 @@ func main() {
 		dsa.GenerateKey(private_key, rand.Reader)
 		log.Println(*private_key)
 	case "hash":
-		hash := computeHash(FirstData)
+		hash := utils.ComputeHash([]byte(FirstData))
 		log.Println(hash)
-  default:
-    log.Println("wrong argument: ", os.Args[1])
+	default:
+		log.Println("wrong argument: ", os.Args[1])
 	}
 }
