@@ -6,9 +6,14 @@ import (
 	pseudorand "math/rand"
 )
 
-func ComputeHash(data []byte) string {
-	result := sha256.Sum256(data)
-	return base64.StdEncoding.EncodeToString(result[:])
+func ComputeHash(data []byte)[]byte{
+  res := sha256.Sum256(data)
+  return res[:]
+}
+
+func ComputeHashEncoded(data []byte) string {
+	hash := ComputeHash(data)
+	return base64.StdEncoding.EncodeToString(hash)
 }
 
 func ReadRandom(len int) (result []byte, err error) {
