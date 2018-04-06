@@ -6,9 +6,9 @@ import (
 	pseudorand "math/rand"
 )
 
-func ComputeHash(data []byte)[]byte{
-  res := sha256.Sum256(data)
-  return res[:]
+func ComputeHash(data []byte) []byte {
+	res := sha256.Sum256(data)
+	return res[:]
 }
 
 func ComputeHashEncoded(data []byte) string {

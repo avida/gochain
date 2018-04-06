@@ -3,9 +3,16 @@ package chain
 import (
 	"../utils"
 	"fmt"
-  "time"
-  "strconv"
-  "log"
+	"log"
+	"math"
+	"strconv"
+	"sync"
+	"time"
+)
+
+const (
+	MAX_UINT = ^uint(0)
+	THREADS  = 8
 )
 
 type BlockHeader struct {
@@ -13,10 +20,11 @@ type BlockHeader struct {
 	PrevHash, BlockHash string
 	Timestamp           string
 	Data                []byte
-  Nonce               uint
+	Nonce               uint
 }
 
-func NewBlockHeader(prev *BlockHeader, data []byte) (err error, block BlockHeader) { err = nil
+func NewBlockHeader(prev *BlockHeader, data []byte) (err error, block BlockHeader) {
+	err = nil
 	block = BlockHeader{Height: 1}
 	if prev != nil {
 		block.Height = prev.Height + 1
@@ -30,10 +38,10 @@ func NewBlockHeader(prev *BlockHeader, data []byte) (err error, block BlockHeade
 
 func (hdr *BlockHeader) stringToHash() string {
 	dataHash := utils.ComputeHashEncoded(hdr.Data)
-  return hdr.Timestamp +
-         hdr.PrevHash +
-         dataHash +
-         strconv.Itoa(int(hdr.Nonce))
+	return hdr.Timestamp +
+		hdr.PrevHash +
+		dataHash +
+		strconv.Itoa(int(hdr.Nonce))
 }
 
 func (hdr *BlockHeader) ComputeHash() string {
@@ -54,41 +62,69 @@ func (hdr *BlockHeader) Verify(prevHdr *BlockHeader) bool {
 }
 
 func CheckHashOk(data []byte, difficulty uint) bool {
-  for currentByte := 0;difficulty > 0;  currentByte++ {
-    if difficulty <=8 {
-      if bt := data[currentByte] >> (8 - difficulty);  bt != 0 {
-        return false
-      }
-      difficulty = 0
-    } else {
-      if data[currentByte] != 0 {
-        return false
-      }
-      difficulty -= 8
-    }
-  }
-  return true
+	for currentByte := 0; difficulty > 0; currentByte++ {
+		if difficulty <= 8 {
+			if bt := data[currentByte] >> (8 - difficulty); bt != 0 {
+				return false
+			}
+			difficulty = 0
+		} else {
+			if data[currentByte] != 0 {
+				return false
+			}
+			difficulty -= 8
+		}
+	}
+	return true
 }
 
-func Mine(hdr *BlockHeader, difficulty uint, c chan bool) {
-  log.Println("go working")
-  for hdr.Nonce = 0;; hdr.Nonce += 1{
-      hashStr := hdr.stringToHash()
-      hash := utils.ComputeHash([]byte(hashStr))
-      if CheckHashOk(hash, difficulty) {
-        hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashStr))
-        c<- true
-        return
-      }
-  }
-  c<- false
+func Mine(hdr *BlockHeader, difficulty uint, c <-chan uint, res_ch chan<- uint, wg *sync.WaitGroup) {
+	defer func() {
+		log.Println("Done")
+	}()
+	for {
+		val, ok := <-c
+		if !ok {
+			break
+		}
+		hdr.Nonce = val
+		hashStr := hdr.stringToHash()
+		hash := utils.ComputeHash([]byte(hashStr))
+		if CheckHashOk(hash, difficulty) {
+			hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashStr))
+			log.Printf("Found %d", val)
+			res_ch <- val
+			break
+		}
+	}
+	wg.Done()
 }
 
-func (hdr *BlockHeader)MineNext(difficulty uint) bool{
-  c:= make(chan bool)
-  go Mine(hdr, difficulty, c)
-  res:= <-c
-  return res
+func (hdr *BlockHeader) MineNext(difficulty uint, threads int) bool {
+	now := time.Now().UnixNano()
+	c := make(chan uint, THREADS*1024)
+	res_ch := make(chan uint, THREADS)
+	var wg sync.WaitGroup
+	for i := 1; i <= THREADS; i++ {
+		wg.Add(1)
+		go Mine(hdr, difficulty, c, res_ch, &wg)
+	}
+f_loop:
+	for i := uint(0); i < MAX_UINT; i++ {
+		select {
+		case _ = <-res_ch:
+			break f_loop
+		default:
+			c <- i
+		}
+	}
+	close(c)
+	log.Println("Wait")
+	wg.Wait()
+	time_elapsed := float64(time.Now().UnixNano()-now) / math.Pow10(6)
+	log.Printf("Time elapsed: %f ms", time_elapsed)
+	log.Printf("Hashrate: %f", 1000*float64(hdr.Nonce)/time_elapsed)
+	return true
 }
 
 func (hdr *BlockHeader) Print() string {
