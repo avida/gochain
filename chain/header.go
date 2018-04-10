@@ -6,13 +6,11 @@ import (
 	"log"
 	"math"
 	"strconv"
-	"sync"
 	"time"
 )
 
 const (
 	MAX_UINT = ^uint(0)
-	THREADS  = 8
 )
 
 type BlockHeader struct {
@@ -78,52 +76,15 @@ func CheckHashOk(data []byte, difficulty uint) bool {
 	return true
 }
 
-func Mine(hdr *BlockHeader, difficulty uint, c <-chan uint, res_ch chan<- uint, wg *sync.WaitGroup) {
-	defer func() {
-		log.Println("Done")
-	}()
-	for {
-		val, ok := <-c
-		if !ok {
-			break
-		}
-		hdr.Nonce = val
-		hashStr := hdr.stringToHash()
-		hash := utils.ComputeHash([]byte(hashStr))
-		if CheckHashOk(hash, difficulty) {
-			hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashStr))
-			log.Printf("Found %d", val)
-			res_ch <- val
-			break
-		}
-	}
-	wg.Done()
-}
-
-func (hdr *BlockHeader) MineNext(difficulty uint, threads int) bool {
+func (hdr *BlockHeader) MineNext(difficulty uint, miner Miner) bool {
 	now := time.Now().UnixNano()
-	c := make(chan uint, THREADS*1024)
-	res_ch := make(chan uint, THREADS)
-	var wg sync.WaitGroup
-	for i := 1; i <= THREADS; i++ {
-		wg.Add(1)
-		go Mine(hdr, difficulty, c, res_ch, &wg)
+	if miner.MineNext(hdr, difficulty) {
+		time_elapsed := float64(time.Now().UnixNano()-now) / math.Pow10(6)
+		hdr.Nonce = miner.GetResult()
+		log.Printf("nonce: %d", hdr.Nonce)
+		log.Printf("Hashrate: %f", 1000*float64(hdr.Nonce)/time_elapsed)
+		log.Printf("Time elapsed: %f ms", time_elapsed)
 	}
-f_loop:
-	for i := uint(0); i < MAX_UINT; i++ {
-		select {
-		case _ = <-res_ch:
-			break f_loop
-		default:
-			c <- i
-		}
-	}
-	close(c)
-	log.Println("Wait")
-	wg.Wait()
-	time_elapsed := float64(time.Now().UnixNano()-now) / math.Pow10(6)
-	log.Printf("Time elapsed: %f ms", time_elapsed)
-	log.Printf("Hashrate: %f", 1000*float64(hdr.Nonce)/time_elapsed)
 	return true
 }
 

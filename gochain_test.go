@@ -55,22 +55,23 @@ func TestChain(t *testing.T) {
 	log.Println(newChain.Verify())
 }
 
-const MineDifficulty = 26
+const MineDifficulty = 16
 
 func TestMine(t *testing.T) {
 	b, _ := utils.ReadRandom(50)
 	_, hdr := chain.NewBlockHeader(nil, b)
 	b, _ = utils.ReadRandom(50)
 	_, nextHdr := chain.NewBlockHeader(&hdr, b)
-	nextHdr.MineNext(MineDifficulty, 4)
+	var miner chain.MultiThreadMiner
+	nextHdr.MineNext(MineDifficulty, &miner)
 	if !nextHdr.Verify(&hdr) {
-		t.Fail()
+		t.Fatal("Block verification failed")
+	}
+	hash, err := base64.StdEncoding.DecodeString(nextHdr.BlockHash)
+	if err != nil || !chain.CheckHashOk(hash, MineDifficulty) {
+		t.Fatal("Difficulty doesnt match")
 	}
 	log.Println(nextHdr.Print())
-	hash, err := base64.StdEncoding.DecodeString(nextHdr.BlockHash)
-	if err != nil {
-		t.Errorf("Error decoding: %s", err)
-	}
 	log.Println(hash)
 }
 
@@ -91,4 +92,9 @@ func TestDifficultyCheck(t *testing.T) {
 		"Difficulty check failed")
 	MyT.checkTrue(!chain.CheckHashOk(hash, 20),
 		"Difficulty check failed")
+}
+
+func TestMiner(t *testing.T) {
+	var miner chain.MultiThreadRangeMiner
+	miner.MineNext(nil, 0)
 }
