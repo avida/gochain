@@ -7,6 +7,7 @@ import (
 	"log"
 	"strconv"
 	"testing"
+	//"github.com/davecgh/go-spew/spew"
 )
 
 type MyT testing.T
@@ -38,40 +39,54 @@ func TestCreateHeader(t *testing.T) {
 }
 
 func TestChain(t *testing.T) {
+	MyT := (*MyT)(t)
 	log.Println("Chain test")
-	var newChain chain.Chain
-	var currentHdr *chain.BlockHeader = nil
-	for i := 0; i < 20; i++ {
-		b, _ := utils.ReadRandom(1024 * 1024)
-		_, nextHdr := chain.NewBlockHeader(currentHdr, b)
-		currentHdr = &nextHdr
-		newChain = append(newChain, *currentHdr)
+  const Blocks = 20
+  const Difficulty = 16
+	var ledger chain.Chain
+	for i := 0; i < Blocks; i++ {
+    block := ledger.AddBlock()
+    var miner chain.MultiThreadMiner
+    block.MineNext(Difficulty, &miner)
 	}
-	for i := range newChain {
-		log.Println(newChain[i].Print())
-	}
-	log.Println(newChain.Verify())
-	newChain[1].Data[2] = 0
-	log.Println(newChain.Verify())
+  MyT.checkTrue(ledger.Verify(), "Check ledger")
+  log.Println(len(ledger))
+  for block:= range ledger {
+    hash, err := base64.StdEncoding.DecodeString(ledger[block].BlockHash)
+    MyT.checkTrue(err == nil, "Hash decoded ok")
+    MyT.checkTrue(chain.CheckHashOk(hash, Difficulty), "Check block number " + string(block))
+  }
+	ledger[7].Data[2] = 0
+	MyT.checkTrue(ledger.Verify() == false, "Check modified ledger fail")
 }
 
-const MineDifficulty = 16
+const MineDifficulty = 24
+
+func MakeBlock(prevBlock *chain.BlockHeader, data_size uint ) (err error, block *chain.BlockHeader) {
+	b, e := utils.ReadRandom(50)
+  if e != nil {
+    return e, nil
+  }
+	e, hdr := chain.NewBlockHeader(prevBlock, b)
+  if e != nil {
+    return e, nil
+  }
+  return nil, &hdr
+}
 
 func TestMine(t *testing.T) {
-	b, _ := utils.ReadRandom(50)
-	_, hdr := chain.NewBlockHeader(nil, b)
-	b, _ = utils.ReadRandom(50)
-	_, nextHdr := chain.NewBlockHeader(&hdr, b)
+  _, firstBlock:= MakeBlock(nil, 50)
+  _, secondBlock:= MakeBlock(firstBlock, 50)
 	var miner chain.MultiThreadMiner
-	nextHdr.MineNext(MineDifficulty, &miner)
-	if !nextHdr.Verify(&hdr) {
+	secondBlock.MineNext(MineDifficulty, &miner)
+	if !secondBlock.Verify(firstBlock) {
 		t.Fatal("Block verification failed")
 	}
-	hash, err := base64.StdEncoding.DecodeString(nextHdr.BlockHash)
+	hash, err := base64.StdEncoding.DecodeString(secondBlock.BlockHash)
 	if err != nil || !chain.CheckHashOk(hash, MineDifficulty) {
 		t.Fatal("Difficulty doesnt match")
 	}
-	log.Println(nextHdr.Print())
+	log.Println(secondBlock.Print())
 	log.Println(hash)
 }
 
@@ -94,7 +109,16 @@ func TestDifficultyCheck(t *testing.T) {
 		"Difficulty check failed")
 }
 
-func TestMiner(t *testing.T) {
+func TestRangeMiner(t *testing.T) {
+	MyT := (*MyT)(t)
+  _, firstBlock:= MakeBlock(nil, 50)
+  _, secondBlock:= MakeBlock(firstBlock, 50)
 	var miner chain.MultiThreadRangeMiner
-	miner.MineNext(nil, 0)
+	secondBlock.MineNext(MineDifficulty, &miner)
+  MyT.checkTrue(secondBlock.Verify(firstBlock),
+  "Check block validity")
+	hash, _:= base64.StdEncoding.DecodeString(secondBlock.BlockHash)
+  MyT.checkTrue(chain.CheckHashOk(hash, MineDifficulty),
+  "Chechk difficulty matches")
+  log.Println(hash)
 }

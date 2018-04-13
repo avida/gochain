@@ -3,8 +3,8 @@ package chain
 import (
 	"../utils"
 	"fmt"
-	"log"
-	"math"
+//	"log"
+	//"math"
 	"strconv"
 	"time"
 )
@@ -77,13 +77,15 @@ func CheckHashOk(data []byte, difficulty uint) bool {
 }
 
 func (hdr *BlockHeader) MineNext(difficulty uint, miner Miner) bool {
-	now := time.Now().UnixNano()
+	//now := time.Now().UnixNano()
 	if miner.MineNext(hdr, difficulty) {
-		time_elapsed := float64(time.Now().UnixNano()-now) / math.Pow10(6)
 		hdr.Nonce = miner.GetResult()
+    /*
+		time_elapsed := float64(time.Now().UnixNano()-now) / math.Pow10(6)
 		log.Printf("nonce: %d", hdr.Nonce)
-		log.Printf("Hashrate: %f", 1000*float64(hdr.Nonce)/time_elapsed)
+		log.Printf("Hashrate: %f", 1000*float64(miner.GetHashProcessed())/time_elapsed)
 		log.Printf("Time elapsed: %f ms", time_elapsed)
+    */
 	}
 	return true
 }

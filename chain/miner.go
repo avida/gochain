@@ -2,23 +2,24 @@ package chain
 
 import (
 	"../utils"
-	"github.com/davecgh/go-spew/spew"
 	"log"
 	"sync"
 	//"math"
 )
 
 const (
-	THREADS = 3
+	THREADS = 8
 )
 
 type Miner interface {
 	MineNext(hdr *BlockHeader, difficulty uint) bool
 	GetResult() uint
+  GetHashProcessed() uint
 }
 
 type SimpleMiner struct {
 	result uint
+  hashProcessed uint
 }
 
 type MultiThreadMiner struct {
@@ -36,7 +37,8 @@ func (miner *SimpleMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
 		hash := utils.ComputeHash([]byte(hashStr))
 		if CheckHashOk(hash, difficulty) {
 			hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashStr))
-			miner.result = i
+			miner.hashProcessed = i
+      miner.result = i
 			log.Printf("Found %d", miner.result)
 			return true
 			break
@@ -46,8 +48,11 @@ func (miner *SimpleMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
 }
 
 func (miner *SimpleMiner) GetResult() uint {
-	log.Println("get result ", miner.result)
 	return miner.result
+}
+
+func (miner *SimpleMiner) GetHashProcessed() uint {
+	return miner.hashProcessed
 }
 
 func (miner *MultiThreadMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
@@ -63,7 +68,8 @@ f_loop:
 		select {
 		case nonce := <-res_ch:
 			log.Println("nonce found: ", nonce)
-			miner.result = nonce
+			miner.hashProcessed = nonce
+      miner.result = nonce
 			break f_loop
 		default:
 			c <- i
@@ -75,6 +81,7 @@ f_loop:
 }
 
 func Mine(hdr *BlockHeader, difficulty uint, c <-chan uint, res_ch chan<- uint, wg *sync.WaitGroup) {
+
 	defer func() {
 		_ = <-c
 	}()
@@ -111,17 +118,67 @@ func (rng *Range) Next() (val uint, ok bool) {
 	return rng.current - 1, true
 }
 
+func (rng *Range) Diff() uint {
+  return rng.current - rng.from
+}
+
 func makeRange(from, to uint) Range {
 	return Range{from, to, from}
 }
 
+func MineRange(hdr *BlockHeader, difficulty uint, rng *Range, res_ch chan<- uint, done_ch <-chan bool, wg *sync.WaitGroup) {
+	defer func() {
+    wg.Done()
+	}()
+	hdr_cpy := *hdr
+  var i uint
+  ok := true
+
+  for {
+  select {
+    case _,_ = <-done_ch:
+      return
+    default:
+      cntr:=0
+      for ; ok && cntr < 10; i, ok = rng.Next(){
+        hdr_cpy.Nonce = i
+        hashstr := hdr_cpy.stringToHash()
+        hash := utils.ComputeHash([]byte(hashstr))
+        if CheckHashOk(hash, difficulty) {
+          hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashstr))
+          log.Printf("found %d", i)
+          res_ch <- i
+          return
+        }
+        cntr++
+      }
+  }
+  }
+}
+
 func (miner *MultiThreadRangeMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
 	var ranges [THREADS]Range
+	var wg sync.WaitGroup
+  res_ch := make(chan uint)
+  done_ch:= make(chan bool)
 	rangePower := MAX_UINT / THREADS
-	log.Println("Max int: ", MAX_UINT)
+  for i:= 0; i< THREADS; i++ {
+    ranges[i] = makeRange(uint(i)*rangePower, uint(i+1)*rangePower)
+  }
 	for i := range ranges {
-		ranges[i] = makeRange(uint(i)*rangePower, uint(i+1)*rangePower)
-		log.Println(spew.Sdump(ranges[i]))
+    wg.Add(1)
+    go MineRange(hdr, difficulty, &ranges[i], res_ch, done_ch, &wg )
 	}
+  select {
+    case nonce := <-res_ch:
+      log.Println("nonce found: ", nonce)
+      miner.result = nonce
+  }
+  close(done_ch)
+  wg.Wait()
+  miner.hashProcessed = 0
+  for i:=range ranges {
+    miner.hashProcessed += ranges[i].Diff()
+  }
 	return true
 }
