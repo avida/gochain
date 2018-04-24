@@ -2,24 +2,24 @@ package chain
 
 import (
 	"../utils"
-  "sync"
+	"sync"
 	//"math"
 )
 
 const (
-	THREADS = 8
-  LOG_PREFIX = "miner"
+	THREADS    = 8
+	LOG_PREFIX = "miner"
 )
 
 type Miner interface {
 	MineNext(hdr *BlockHeader, difficulty uint) bool
 	GetResult() uint
-  GetHashProcessed() uint
+	GetHashProcessed() uint
 }
 
 type SimpleMiner struct {
-	result uint
-  hashProcessed uint
+	result        uint
+	hashProcessed uint
 }
 
 type MultiThreadMiner struct {
@@ -31,7 +31,7 @@ type MultiThreadRangeMiner struct {
 }
 
 func (miner *SimpleMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
-  logger := utils.GetLogger(LOG_PREFIX)
+	logger := utils.GetLogger(LOG_PREFIX)
 	for i := uint(0); i < MAX_UINT; i++ {
 		hdr.Nonce = i
 		hashStr := hdr.stringToHash()
@@ -39,7 +39,7 @@ func (miner *SimpleMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
 		if CheckHashOk(hash, difficulty) {
 			hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashStr))
 			miner.hashProcessed = i
-      miner.result = i
+			miner.result = i
 			logger.Printf("Found %d", miner.result)
 			return true
 			break
@@ -57,7 +57,7 @@ func (miner *SimpleMiner) GetHashProcessed() uint {
 }
 
 func (miner *MultiThreadMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
-  logger := utils.GetLogger("miner")
+	logger := utils.GetLogger("miner")
 	c := make(chan uint, THREADS*1024)
 	res_ch := make(chan uint, THREADS)
 	var wg sync.WaitGroup
@@ -71,7 +71,7 @@ f_loop:
 		case nonce := <-res_ch:
 			logger.Println("nonce found: ", nonce)
 			miner.hashProcessed = nonce
-      miner.result = nonce
+			miner.result = nonce
 			break f_loop
 		default:
 			c <- i
@@ -87,7 +87,7 @@ func Mine(hdr *BlockHeader, difficulty uint, c <-chan uint, res_ch chan<- uint, 
 		_ = <-c
 	}()
 	hdr_cpy := *hdr
-  logger := utils.GetLogger(LOG_PREFIX)
+	logger := utils.GetLogger(LOG_PREFIX)
 	for {
 		val, ok := <-c
 		if !ok {
@@ -121,7 +121,7 @@ func (rng *Range) Next() (val uint, ok bool) {
 }
 
 func (rng *Range) Diff() uint {
-  return rng.current - rng.from
+	return rng.current - rng.from
 }
 
 func makeRange(from, to uint) Range {
@@ -129,62 +129,62 @@ func makeRange(from, to uint) Range {
 }
 
 func MineRange(hdr *BlockHeader, difficulty uint, rng *Range,
-               res_ch chan<- uint, done_ch <-chan bool,
-               wg *sync.WaitGroup) {
+	res_ch chan<- uint, done_ch <-chan bool,
+	wg *sync.WaitGroup) {
 	defer func() {
-    wg.Done()
+		wg.Done()
 	}()
-  logger := utils.GetLogger(LOG_PREFIX)
+	logger := utils.GetLogger(LOG_PREFIX)
 	hdr_cpy := *hdr
-  var i uint
-  ok := true
+	var i uint
+	ok := true
 
-  for {
-  select {
-    case _,_ = <-done_ch:
-      return
-    default:
-      cntr:=0
-      for ; ok && cntr < 10; i, ok = rng.Next(){
-        hdr_cpy.Nonce = i
-        hashstr := hdr_cpy.stringToHash()
-        hash := utils.ComputeHash([]byte(hashstr))
-        if CheckHashOk(hash, difficulty) {
-          hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashstr))
-          logger.Printf("found %d", i)
-          res_ch <- i
-          return
-        }
-        cntr++
-      }
-  }
-  }
+	for {
+		select {
+		case _, _ = <-done_ch:
+			return
+		default:
+			cntr := 0
+			for ; ok && cntr < 10; i, ok = rng.Next() {
+				hdr_cpy.Nonce = i
+				hashstr := hdr_cpy.stringToHash()
+				hash := utils.ComputeHash([]byte(hashstr))
+				if CheckHashOk(hash, difficulty) {
+					hdr.BlockHash = utils.ComputeHashEncoded([]byte(hashstr))
+					logger.Printf("found %d", i)
+					res_ch <- i
+					return
+				}
+				cntr++
+			}
+		}
+	}
 }
 
 func (miner *MultiThreadRangeMiner) MineNext(hdr *BlockHeader, difficulty uint) bool {
 	var ranges [THREADS]Range
 	var wg sync.WaitGroup
-  logger := utils.GetLogger(LOG_PREFIX)
-  res_ch := make(chan uint, THREADS)
-  done_ch:= make(chan bool)
+	logger := utils.GetLogger(LOG_PREFIX)
+	res_ch := make(chan uint, THREADS)
+	done_ch := make(chan bool)
 	rangePower := MAX_UINT / THREADS
-  for i:= 0; i< THREADS; i++ {
-    ranges[i] = makeRange(uint(i)*rangePower, uint(i+1)*rangePower)
-  }
-	for i := range ranges {
-    wg.Add(1)
-    go MineRange(hdr, difficulty, &ranges[i], res_ch, done_ch, &wg )
+	for i := 0; i < THREADS; i++ {
+		ranges[i] = makeRange(uint(i)*rangePower, uint(i+1)*rangePower)
 	}
-  select {
-    case nonce := <-res_ch:
-      logger.Println("nonce found: ", nonce)
-      miner.result = nonce
-  }
-  close(done_ch)
-  wg.Wait()
-  miner.hashProcessed = 0
-  for i:=range ranges {
-    miner.hashProcessed += ranges[i].Diff()
-  }
+	for i := range ranges {
+		wg.Add(1)
+		go MineRange(hdr, difficulty, &ranges[i], res_ch, done_ch, &wg)
+	}
+	select {
+	case nonce := <-res_ch:
+		logger.Println("nonce found: ", nonce)
+		miner.result = nonce
+	}
+	close(done_ch)
+	wg.Wait()
+	miner.hashProcessed = 0
+	for i := range ranges {
+		miner.hashProcessed += ranges[i].Diff()
+	}
 	return true
 }
