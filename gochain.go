@@ -10,6 +10,17 @@ import (
 
 const FirstData = "This is first block data"
 
+func SetupLoggers(){
+  utils.SetupLogger("miner")
+  utils.SetupLogger("chain")
+  utils.SetupLogger("header")
+  utils.SetupLogger("test")
+  //utils.SetOutput("miner", utils.StdOut)
+  //utils.SetOutput("chain", utils.StdOut)
+  //utils.SetOutput("header", utils.File)
+  //utils.SetOutput("test", utils.StdOut)
+}
+
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -18,6 +29,7 @@ func main() {
 	}()
 
 	log.Println("This is my first golang application")
+  SetupLoggers()
 	switch os.Args[1] {
 	case "key":
 		params := new(dsa.Parameters)

@@ -3,14 +3,14 @@ package chain
 import (
 	"../utils"
 	"fmt"
-//	"log"
-	//"math"
+  "math"
 	"strconv"
 	"time"
 )
 
 const (
 	MAX_UINT = ^uint(0)
+  HEADER_LOG_PREFIX = "header"
 )
 
 type BlockHeader struct {
@@ -47,13 +47,17 @@ func (hdr *BlockHeader) ComputeHash() string {
 }
 
 func (hdr *BlockHeader) Verify(prevHdr *BlockHeader) bool {
+  log:= utils.GetLogger(HEADER_LOG_PREFIX)
 	if hdr.Height != prevHdr.Height+1 {
+    log.Println("Wrong height")
 		return false
 	}
 	if hdr.PrevHash != prevHdr.BlockHash {
+    log.Println("PrevHash mismatch")
 		return false
 	}
 	if prevHash := prevHdr.ComputeHash(); hdr.PrevHash != prevHash {
+    log.Println("Hash mismatch")
 		return false
 	}
 	return true
@@ -77,15 +81,15 @@ func CheckHashOk(data []byte, difficulty uint) bool {
 }
 
 func (hdr *BlockHeader) MineNext(difficulty uint, miner Miner) bool {
-	//now := time.Now().UnixNano()
+  logger := utils.GetLogger(HEADER_LOG_PREFIX)
+	now := time.Now().UnixNano()
 	if miner.MineNext(hdr, difficulty) {
 		hdr.Nonce = miner.GetResult()
-    /*
+    hdr.BlockHash = hdr.ComputeHash()
 		time_elapsed := float64(time.Now().UnixNano()-now) / math.Pow10(6)
-		log.Printf("nonce: %d", hdr.Nonce)
-		log.Printf("Hashrate: %f", 1000*float64(miner.GetHashProcessed())/time_elapsed)
-		log.Printf("Time elapsed: %f ms", time_elapsed)
-    */
+		logger.Printf("nonce: %d", hdr.Nonce)
+		logger.Printf("Hashrate: %f", 1000*float64(miner.GetHashProcessed())/time_elapsed)
+		logger.Printf("Time elapsed: %f ms", time_elapsed)
 	}
 	return true
 }
