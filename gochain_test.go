@@ -8,12 +8,11 @@ import (
 	"os"
 	"strconv"
 	"testing"
-	//"github.com/davecgh/go-spew/spew"
 )
 
 const (
 	TEST_LOG_PREFIX = "test"
-	MINE_DIFFICULTY = 22
+	MINE_DIFFICULTY = 24
 )
 
 var logger *log.Logger
@@ -60,8 +59,8 @@ func TestChain(t *testing.T) {
 	var ledger chain.Chain
 	for i := 0; i < Blocks; i++ {
 		block := ledger.AddBlock()
-		var miner chain.MultiThreadRangeMiner
-		block.MineNext(Difficulty, &miner)
+		miner := chain.MakeMultiThreadMiner(8)
+		block.MineNext(Difficulty, miner)
 	}
 	MyT.checkTrue(ledger.Verify(), "Check ledger")
 	for block := range ledger {
@@ -88,8 +87,8 @@ func MakeBlock(prevBlock *chain.BlockHeader, data_size uint) (err error, block *
 func TestMine(t *testing.T) {
 	_, firstBlock := MakeBlock(nil, 50)
 	_, secondBlock := MakeBlock(firstBlock, 50)
-	var miner chain.MultiThreadMiner
-	secondBlock.MineNext(MINE_DIFFICULTY, &miner)
+	miner := chain.MakeMultiThreadMiner(8)
+	secondBlock.MineNext(MINE_DIFFICULTY, miner)
 	if !secondBlock.Verify(firstBlock) {
 		t.Fatal("Block verification failed")
 	}
@@ -124,12 +123,12 @@ func TestRangeMiner(t *testing.T) {
 	MyT := (*MyT)(t)
 	_, firstBlock := MakeBlock(nil, 50)
 	_, secondBlock := MakeBlock(firstBlock, 50)
-	var miner chain.MultiThreadRangeMiner
-	secondBlock.MineNext(MINE_DIFFICULTY, &miner)
+	miner := chain.MakeRangeMiner(8)
+	secondBlock.MineNext(MINE_DIFFICULTY, miner)
 	MyT.checkTrue(secondBlock.Verify(firstBlock),
 		"Check block validity")
 	hash, _ := base64.StdEncoding.DecodeString(secondBlock.BlockHash)
 	MyT.checkTrue(chain.CheckHashOk(hash, MINE_DIFFICULTY),
-		"Chechk difficulty matches")
+		"Check difficulty matches")
 	logger.Println(hash)
 }

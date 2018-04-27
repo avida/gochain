@@ -47,17 +47,17 @@ func (hdr *BlockHeader) ComputeHash() string {
 }
 
 func (hdr *BlockHeader) Verify(prevHdr *BlockHeader) bool {
-	log := utils.GetLogger(HEADER_LOG_PREFIX)
+	logger := utils.GetLogger(HEADER_LOG_PREFIX)
 	if hdr.Height != prevHdr.Height+1 {
-		log.Println("Wrong height")
+		logger.Println("Wrong height")
 		return false
 	}
 	if hdr.PrevHash != prevHdr.BlockHash {
-		log.Println("PrevHash mismatch")
+		logger.Println("PrevHash mismatch")
 		return false
 	}
 	if prevHash := prevHdr.ComputeHash(); hdr.PrevHash != prevHash {
-		log.Println("Hash mismatch")
+		logger.Println("Hash mismatch")
 		return false
 	}
 	return true
@@ -84,12 +84,16 @@ func (hdr *BlockHeader) MineNext(difficulty uint, miner Miner) bool {
 	logger := utils.GetLogger(HEADER_LOG_PREFIX)
 	now := time.Now().UnixNano()
 	if miner.MineNext(hdr, difficulty) {
-		hdr.Nonce = miner.GetResult()
+		result := miner.GetResult()
+		hdr.Nonce = result.Nonce
+		hdr.Timestamp = result.Timestamp
 		hdr.BlockHash = hdr.ComputeHash()
 		time_elapsed := float64(time.Now().UnixNano()-now) / math.Pow10(6)
 		logger.Printf("nonce: %d", hdr.Nonce)
 		logger.Printf("Hashrate: %f", 1000*float64(miner.GetHashProcessed())/time_elapsed)
 		logger.Printf("Time elapsed: %f ms", time_elapsed)
+	} else {
+		logger.Printf("CouldntMine anything")
 	}
 	return true
 }
