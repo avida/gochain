@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"../db"
 	"../utils"
 	"fmt"
 	"math"
@@ -13,13 +14,7 @@ const (
 	HEADER_LOG_PREFIX = "header"
 )
 
-type BlockHeader struct {
-	Height              int
-	PrevHash, BlockHash string
-	Timestamp           string
-	Data                []byte
-	Nonce               uint
-}
+type BlockHeader db.BlockHeader
 
 func NewBlockHeader(prev *BlockHeader, data []byte) (err error, block BlockHeader) {
 	err = nil

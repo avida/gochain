@@ -54,3 +54,18 @@ func SetOutput(prefix string, out LogOutput) {
 	}
 
 }
+
+func SetupLoggers() {
+	SetupLogger("miner")
+	SetupLogger("chain")
+	SetupLogger("header")
+	SetupLogger("test")
+	SetupLogger("main")
+	SetupLogger("db")
+	//SetOutput("miner", StdOut)
+	//SetOutput("header", StdOut)
+	//SetOutput("chain", StdOut)
+	SetOutput("test", StdOut)
+	SetOutput("db", StdOut)
+	SetOutput("main", StdOut)
+}
