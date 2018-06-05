@@ -1,8 +1,10 @@
 package chain
 
 import (
+	"../db"
 	"../utils"
 	"encoding/base64"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -24,10 +26,16 @@ func (t *MyT) checkTrue(condition bool, errorMsg string) {
 		t.Error(errorMsg)
 	}
 }
+func (t *MyT) checkError(err error, errorMsg string) {
+	if err != nil {
+		t.Error(fmt.Sprintf("Unexpected when %s error: %v", errorMsg, err))
+	}
+}
 
 func TestMain(m *testing.M) {
 	utils.SetupLoggers()
 	logger = utils.GetLogger(TEST_LOG_PREFIX)
+	utils.ReadConf("../test")
 	os.Exit(m.Run())
 }
 
@@ -131,4 +139,33 @@ func TestRangeMiner(t *testing.T) {
 	MyT.checkTrue(CheckHashOk(hash, MINE_DIFFICULTY),
 		"Check difficulty matches")
 	logger.Println(hash)
+}
+
+func TestSaveLoad(t *testing.T) {
+	MyT := (*MyT)(t)
+	MyT.checkError(db.Connect(), "Connecting to DB")
+	const Blocks = 30
+	const Difficulty = 8
+	var ledger Chain
+	for i := 0; i < Blocks; i++ {
+		block := ledger.AddBlock()
+		miner := MakeMultiThreadMiner(8)
+		block.MineNext(Difficulty, miner)
+		logger.Printf("%d: %v\n", i, block)
+	}
+	MyT.checkTrue(ledger.Verify(), "Check ledger")
+	logger.Println("chain ")
+	for _, block := range ledger {
+		MyT.checkError(db.SaveBlock((*db.BlockHeader)(block)), "Saving block")
+	}
+	var restoredLedger Chain
+	for i := 1; i <= Blocks; i++ {
+		err, restored := db.LoadBlock(i)
+		MyT.checkError(err, "Loading block")
+		restoredLedger = append(restoredLedger, (*BlockHeader)(restored))
+	}
+	for i, block := range restoredLedger {
+		logger.Printf("%d: %v\n", i, block)
+	}
+	MyT.checkTrue(restoredLedger.Verify(), "Check restored ledger")
 }

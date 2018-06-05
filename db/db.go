@@ -43,21 +43,23 @@ func Connect() error {
 }
 
 func SaveBlock(block *BlockHeader) error {
-  return db.Save(block)
+	return db.Save(block)
 }
 
 func LoadBlock(height int) (error, *BlockHeader) {
 	restored, err := db.FindByPrimaryKeyFrom(BlockHeaderTable, height)
-  if err == nil {
-    // Strings that are shorter than 40 symbols (defined in schema.sql) are padded with the whitespaces.
-    restored.(*BlockHeader).Timestamp = strings.Trim(restored.(*BlockHeader).Timestamp, " ")
-    return nil, restored.(*BlockHeader)
-  }
+	if err == nil {
+		// Strings that are shorter than 40 symbols (defined in schema.sql) are padded with the whitespaces.
+		restored.(*BlockHeader).BlockHash = strings.Trim(restored.(*BlockHeader).BlockHash, " ")
+		restored.(*BlockHeader).PrevHash = strings.Trim(restored.(*BlockHeader).PrevHash, " ")
+		restored.(*BlockHeader).Timestamp = strings.Trim(restored.(*BlockHeader).Timestamp, " ")
+		return nil, restored.(*BlockHeader)
+	}
 	return err, nil
 }
 
-func DeleteBlock(height int) error{
-  block:= BlockHeaderTable.NewRecord()
-  block.(*BlockHeader).Height = height
-  return db.Delete(block)
+func DeleteBlock(height int) error {
+	block := BlockHeaderTable.NewRecord()
+	block.(*BlockHeader).Height = height
+	return db.Delete(block)
 }

@@ -66,6 +66,9 @@ func SetupLoggers() {
 	//SetOutput("header", StdOut)
 	//SetOutput("chain", StdOut)
 	SetOutput("test", StdOut)
+	SetOutput("test", File)
+	SetOutput("header", File)
+	SetOutput("chain", File)
 	SetOutput("db", StdOut)
 	SetOutput("main", StdOut)
 }

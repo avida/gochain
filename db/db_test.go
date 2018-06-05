@@ -22,10 +22,10 @@ func TestMain(m *testing.M) {
 
 func TestSimpleDBWrite(t *testing.T) {
 	logger.Println("TestDb")
-  err := Connect()
-  if err != nil {
-    t.Errorf("Error connecting to db: %v", err)
-  }
+	err := Connect()
+	if err != nil {
+		t.Errorf("Error connecting to db: %v", err)
+	}
 
 	randomBytes, _ := utils.ReadRandom(2 * 10)
 	chain := &BlockHeader{
